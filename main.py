@@ -14,6 +14,41 @@ COROUTINES = []
 TIC_TIMEOUT = 0.1
 OBSTACLES = []
 obstacles_in_last_collisions = []
+year = 1957
+PHRASES = {
+    1957: "First Sputnik",
+    1961: "Gagarin flew!",
+    1969: "Armstrong got on the moon!",
+    1971: "First orbital space station Salute-1",
+    1981: "Flight of the Shuttle Columbia",
+    1998: 'ISS start building',
+    2011: 'Messenger launch to Mercury',
+    2020: "Take the plasma gun! Shoot the garbage!",
+}
+
+def get_garbage_delay_tics(year):
+    if year < 1961:
+        return None
+    elif year < 1969:
+        return 20
+    elif year < 1981:
+        return 14
+    elif year < 1995:
+        return 10
+    elif year < 2010:
+        return 8
+    elif year < 2020:
+        return 6
+    else:
+        return 2
+async def get_text_for_info_frame(info_frame):
+    global year
+    while True:
+        await sleep(2)
+        year += 1
+        massage = f"year: {year} - {PHRASES.get(year,'')}"
+        info_frame.addstr(1,1,massage)
+        await asyncio.sleep(0)
 async def show_game_over(canvas):
     with open(os.path.join("game_over","game_over.txt"),"r") as f:
         game_over = f.read()
@@ -131,19 +166,23 @@ def draw(canvas):
                   random.choice(["*", ".", ":", "+"])))
     COROUTINES.append(ship)
     COROUTINES.append(fill_orbit_with_garbage(canvas, column))
+    info_frame_length = 50
+    info_frame_height = 4
+    info_frame = canvas.derwin(row-info_frame_height,column-info_frame_length)
+    COROUTINES.append(get_text_for_info_frame(info_frame))
     loop = asyncio.get_event_loop()
     loop.create_task(show_obstacles(canvas, OBSTACLES))
-    loop.create_task(async_draw(canvas))
+    loop.create_task(async_draw(canvas,info_frame))
     loop.run_forever()
-async def async_draw(canvas):
+async def async_draw(canvas,info_frame):
     while True:
         for coroutine in COROUTINES.copy():
             try:
                 coroutine.send(None)
             except StopIteration:
                 COROUTINES.remove(coroutine)
-
         canvas.refresh()
+        info_frame.refresh()
         await asyncio.sleep(TIC_TIMEOUT)
 
 if __name__ == '__main__':
