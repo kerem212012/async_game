@@ -7,12 +7,20 @@ from animations.obstacles import Obstacle, show_obstacles, has_collision
 from animations.physics import update_speed
 from animations.stars import blink,sleep
 from animations.starship import get_rockets, twice_cycle
+from animations.explosion import explode
+
 
 COROUTINES = []
 TIC_TIMEOUT = 0.1
 OBSTACLES = []
 obstacles_in_last_collisions = []
-
+async def show_game_over(canvas):
+    with open(os.path.join("game_over","game_over.txt"),"r") as f:
+        game_over = f.read()
+    row,column = curses.window.getmaxyx(canvas)
+    while True:
+        draw_frame(canvas,round(row/2),round(column/3),game_over)
+        await asyncio.sleep(0)
 async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0):
     """Display animation of gun shot, direction and speed can be specified."""
 
@@ -37,6 +45,7 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
         for obstacle in OBSTACLES.copy():
             if obstacle.has_collision(row,column):
                 obstacles_in_last_collisions.append(obstacle)
+                await explode(canvas, row, column)
                 return
         canvas.addstr(round(row), round(column), symbol)
         await asyncio.sleep(0)
@@ -96,6 +105,10 @@ async def animate_spaceship(canvas, row, column):
     motion_height = row_height - frame_height
     motion_width = column_width - frame_width
     for frame in twice_cycle(rockets):
+        for obstacle in OBSTACLES.copy():
+            if obstacle.has_collision(row,column):
+                COROUTINES.append(show_game_over(canvas))
+                return
         rows_direction, columns_direction, space_pressed = read_controls(canvas)
         row_speed, column_speed = update_speed(0, 0, rows_direction, columns_direction)
         row = max(1, min(row + row_speed, motion_height))
