@@ -11,6 +11,7 @@ from animations.starship import get_rockets, twice_cycle
 COROUTINES = []
 TIC_TIMEOUT = 0.1
 OBSTACLES = []
+obstacles_in_last_collisions = []
 
 async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0):
     """Display animation of gun shot, direction and speed can be specified."""
@@ -35,7 +36,7 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
     while 0 < row < max_row and 0 < column < max_column:
         for obstacle in OBSTACLES.copy():
             if obstacle.has_collision(row,column):
-                OBSTACLES.remove(obstacle)
+                obstacles_in_last_collisions.append(obstacle)
                 return
         canvas.addstr(round(row), round(column), symbol)
         await asyncio.sleep(0)
@@ -58,6 +59,9 @@ async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
 
     try:
         while row < rows_number:
+            if current_obstacle in obstacles_in_last_collisions:
+                obstacles_in_last_collisions.remove(current_obstacle)
+                return
             draw_frame(canvas, row, column, garbage_frame)
             await asyncio.sleep(0)
             draw_frame(canvas, row, column, garbage_frame, negative=True)
