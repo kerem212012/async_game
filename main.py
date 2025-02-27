@@ -2,19 +2,46 @@ import asyncio
 import curses
 import os
 import random
-import time
-
 from animations.curses_tools import draw_frame, get_frame_size, read_controls
-from animations.fire_animation import fire
-from animations.obstacles import Obstacle, show_obstacles
+from animations.obstacles import Obstacle, show_obstacles, has_collision
 from animations.physics import update_speed
-from animations.stars import blink
+from animations.stars import blink,sleep
 from animations.starship import get_rockets, twice_cycle
 
 COROUTINES = []
 TIC_TIMEOUT = 0.1
 OBSTACLES = []
 
+async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0):
+    """Display animation of gun shot, direction and speed can be specified."""
+
+    row, column = start_row, start_column
+
+    canvas.addstr(round(row), round(column), '*')
+    await asyncio.sleep(0)
+
+    canvas.addstr(round(row), round(column), 'O')
+    await asyncio.sleep(0)
+    canvas.addstr(round(row), round(column), ' ')
+
+    row += rows_speed
+    column += columns_speed
+
+    symbol = '-' if columns_speed else '|'
+
+    rows, columns = canvas.getmaxyx()
+    max_row, max_column = rows - 1, columns - 1
+
+    while 0 < row < max_row and 0 < column < max_column:
+        for obstacle in OBSTACLES.copy():
+            if obstacle.has_collision(row,column):
+                OBSTACLES.remove(obstacle)
+                return
+        canvas.addstr(round(row), round(column), symbol)
+        await asyncio.sleep(0)
+        canvas.addstr(round(row), round(column), ' ')
+        row += rows_speed
+        column += columns_speed
 
 async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
     """Animate garbage, flying from top to bottom. Сolumn position will stay same, as specified on start."""
@@ -55,7 +82,7 @@ async def fill_orbit_with_garbage(canvas, column):
         with open(f"garbage/{garbage}", "r") as f:
             trash = f.read()
         COROUTINES.append(fly_garbage(canvas, random.randint(1, column), trash))
-        await asyncio.sleep(0)
+        await sleep(15)
 
 
 async def animate_spaceship(canvas, row, column):
