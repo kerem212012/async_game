@@ -2,19 +2,19 @@ import asyncio
 import curses
 import os
 import random
-from animations.curses_tools import draw_frame, get_frame_size, read_controls
-from animations.obstacles import Obstacle, show_obstacles, has_collision
-from animations.physics import update_speed
-from animations.stars import blink,sleep
-from animations.starship import get_rockets, twice_cycle
-from animations.explosion import explode
 
+from animations.curses_tools import draw_frame, get_frame_size, read_controls
+from animations.explosion import explode
+from animations.obstacles import Obstacle, show_obstacles
+from animations.physics import update_speed
+from animations.stars import blink, sleep
+from animations.starship import get_rockets, twice_cycle
 
 COROUTINES = []
 TIC_TIMEOUT = 0.1
 OBSTACLES = []
 obstacles_in_last_collisions = []
-year = 1957
+YEAR = 1957
 PHRASES = {
     1957: "First Sputnik",
     1961: "Gagarin flew!",
@@ -25,6 +25,7 @@ PHRASES = {
     2011: 'Messenger launch to Mercury',
     2020: "Take the plasma gun! Shoot the garbage!",
 }
+
 
 def get_garbage_delay_tics(year):
     if year < 1961:
@@ -41,21 +42,27 @@ def get_garbage_delay_tics(year):
         return 6
     else:
         return 2
+
+
 async def get_text_for_info_frame(info_frame):
-    global year
+    global YEAR
     while True:
-        await sleep(2)
-        year += 1
-        massage = f"year: {year} - {PHRASES.get(year,'')}"
-        info_frame.addstr(1,1,massage)
+        await sleep(10)
+        YEAR += 1
+        massage = f"year: {YEAR} - {PHRASES.get(YEAR, '')}"
+        info_frame.addstr(1, 1, massage)
         await asyncio.sleep(0)
+
+
 async def show_game_over(canvas):
-    with open(os.path.join("game_over","game_over.txt"),"r") as f:
+    with open(os.path.join("game_over", "game_over.txt"), "r") as f:
         game_over = f.read()
-    row,column = curses.window.getmaxyx(canvas)
+    row, column = curses.window.getmaxyx(canvas)
     while True:
-        draw_frame(canvas,round(row/2),round(column/3),game_over)
+        draw_frame(canvas, round(row / 2), round(column / 3), game_over)
         await asyncio.sleep(0)
+
+
 async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0):
     """Display animation of gun shot, direction and speed can be specified."""
 
@@ -78,7 +85,7 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
 
     while 0 < row < max_row and 0 < column < max_column:
         for obstacle in OBSTACLES.copy():
-            if obstacle.has_collision(row,column):
+            if obstacle.has_collision(row, column):
                 obstacles_in_last_collisions.append(obstacle)
                 await explode(canvas, row, column)
                 return
@@ -87,6 +94,7 @@ async def fire(canvas, start_row, start_column, rows_speed=-0.3, columns_speed=0
         canvas.addstr(round(row), round(column), ' ')
         row += rows_speed
         column += columns_speed
+
 
 async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
     """Animate garbage, flying from top to bottom. Сolumn position will stay same, as specified on start."""
@@ -115,7 +123,6 @@ async def fly_garbage(canvas, column, garbage_frame, speed=0.5):
         OBSTACLES.remove(current_obstacle)
 
 
-
 def get_stars(canvas, row, column):
     symbols = ["*", ".", ":", "+"]
     stars_count = random.randint(50, 200)
@@ -127,11 +134,13 @@ def get_stars(canvas, row, column):
 async def fill_orbit_with_garbage(canvas, column):
     while True:
         garbage = random.choice(os.listdir("garbage"))
-        with open(f"garbage/{garbage}", "r") as f:
+        with open(os.path.join("garbage", garbage), "r") as f:
             trash = f.read()
-        COROUTINES.append(fly_garbage(canvas, random.randint(1, column), trash))
-        await sleep(15)
-
+        delay = get_garbage_delay_tics(YEAR)
+        if delay:
+            COROUTINES.append(fly_garbage(canvas, random.randint(1, column), trash))
+            await sleep(delay)
+        await asyncio.sleep(0)
 
 async def animate_spaceship(canvas, row, column):
     rockets = get_rockets()
@@ -141,7 +150,7 @@ async def animate_spaceship(canvas, row, column):
     motion_width = column_width - frame_width
     for frame in twice_cycle(rockets):
         for obstacle in OBSTACLES.copy():
-            if obstacle.has_collision(row,column):
+            if obstacle.has_collision(row, column):
                 COROUTINES.append(show_game_over(canvas))
                 return
         rows_direction, columns_direction, space_pressed = read_controls(canvas)
@@ -168,13 +177,14 @@ def draw(canvas):
     COROUTINES.append(fill_orbit_with_garbage(canvas, column))
     info_frame_length = 50
     info_frame_height = 4
-    info_frame = canvas.derwin(row-info_frame_height,column-info_frame_length)
+    info_frame = canvas.derwin(row - info_frame_height, column - info_frame_length)
     COROUTINES.append(get_text_for_info_frame(info_frame))
     loop = asyncio.get_event_loop()
-    loop.create_task(show_obstacles(canvas, OBSTACLES))
-    loop.create_task(async_draw(canvas,info_frame))
+    loop.create_task(async_draw(canvas, info_frame))
     loop.run_forever()
-async def async_draw(canvas,info_frame):
+
+
+async def async_draw(canvas, info_frame):
     while True:
         for coroutine in COROUTINES.copy():
             try:
@@ -184,6 +194,7 @@ async def async_draw(canvas,info_frame):
         canvas.refresh()
         info_frame.refresh()
         await asyncio.sleep(TIC_TIMEOUT)
+
 
 if __name__ == '__main__':
     curses.update_lines_cols()
